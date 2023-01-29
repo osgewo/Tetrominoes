@@ -1,4 +1,4 @@
-use cgmath::{Matrix4, Point3, Vector2, Vector3};
+use glam::{Mat4, Vec2, Vec3};
 use image::GenericImageView;
 use std::{
     num::NonZeroU32,
@@ -47,7 +47,7 @@ impl Vertex {
 #[repr(C)]
 #[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct Instance {
-    position: Vector2<f32>,
+    position: Vec2,
 }
 
 impl Instance {
@@ -63,8 +63,8 @@ impl Instance {
 }
 
 struct Camera {
-    eye: Point3<f32>,
-    target: Point3<f32>,
+    // eye: Point3<f32>,
+    // target: Point3<f32>,
     aspect: f32,
     fovy: f32,
     znear: f32,
@@ -72,22 +72,22 @@ struct Camera {
 }
 
 impl Camera {
-    fn build_proj_mat(&self) -> Matrix4<f32> {
+    fn build_proj_mat(&self) -> Mat4 {
         #[rustfmt::skip]
-        const OPENGL_TO_WGPU: Matrix4<f32> = Matrix4::new(
-            1.0, 0.0, 0.0, 0.0,
-            0.0, 1.0, 0.0, 0.0,
-            0.0, 0.0, 0.5, 0.0,
-            0.0, 0.0, 0.5, 1.0,
-        );
+        // const OPENGL_TO_WGPU: Mat4 = Mat4::new(
+        //     1.0, 0.0, 0.0, 0.0,
+        //     0.0, 1.0, 0.0, 0.0,
+        //     0.0, 0.0, 0.5, 0.0,
+        //     0.0, 0.0, 0.5, 1.0,
+        // );
         // let view = Matrix4::look_at_rh(self.eye, self.target, Vector3::unit_y());
-        let scale = Matrix4::from_nonuniform_scale(1.0, self.aspect, 1.0);
-        // let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
-        let proj = cgmath::ortho(-1.0, 100.0, -1.0, 100.0, 0.1, 100.0);
-        return Matrix4::from_translation(Vector3::new(-1.0, -1.0, 0.0))
+        let scale = Mat4::from_scale(Vec3::new(1.0, self.aspect, 1.0));
+        // // let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
+        // let proj = cgmath::ortho(-1.0, 100.0, -1.0, 100.0, 0.1, 100.0);
+        return Mat4::from_translation(Vec3::new(-1.0, -1.0, 0.0))
             * scale
-            * Matrix4::from_scale(2.0 / 500.0)
-            * Matrix4::from_translation(Vector3::new(0.5, 0.5, 0.0));
+            * Mat4::from_scale(Vec3::new(2.0 / 500.0, 2.0 / 500.0, 2.0 / 500.0))
+            * Mat4::from_translation(Vec3::new(0.5, 0.5, 0.0));
     }
 }
 
@@ -198,8 +198,6 @@ impl ExampleRenderer {
         });
 
         let camera = Camera {
-            eye: (0.0, 0.0, 10.0).into(),
-            target: (10.0, 0.0, 0.0).into(),
             aspect: locked_context.config.width as f32 / locked_context.config.height as f32,
             fovy: 45.0,
             znear: 0.1,
@@ -236,7 +234,7 @@ impl ExampleRenderer {
             }],
         });
 
-        let shader = device.create_shader_module(include_wgsl!("example.wgsl"));
+        let shader = device.create_shader_module(include_wgsl!("shader/example.wgsl"));
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some("Pipeline Layout"),
             bind_group_layouts: &[&diffuse_bind_group_layout, &camera_bind_group_layout],

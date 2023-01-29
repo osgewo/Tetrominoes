@@ -13,6 +13,4 @@ wgpu = "0.14"
 pollster = "0.2"
 bytemuck = { version = "1.12", features = ["derive"] }
 image = { version = "0.24", default-features = false, features = ["png"] }
-# Temporarily use unreleased version of cgmath for bytemuck support
-# cgmath = { version = "0.18", features = ["bytemuck"] }
-cgmath = { git = "https://github.com/rustgd/cgmath", rev = "11a5346", features = ["bytemuck"] }
+glam = { version = "0.22", features = ["scalar-math", "bytemuck"] }

@@ -12,6 +12,7 @@ use winit::{
 };
 
 mod game;
+#[allow(unused)]
 mod grid;
 mod render;
 
@@ -21,10 +22,9 @@ fn main() {
     let window = WindowBuilder::new().build(&event_loop).unwrap();
 
     let render_context = Arc::new(Mutex::new(pollster::block_on(RenderContext::new(&window))));
-    let mut game = Game::new(render_context.clone());
+    let game = Game::new(render_context.clone());
 
     let start_time = Instant::now();
-    let mut updates = 0;
     let mut frames = 0;
 
     event_loop.run(move |event, _, control_flow| {
@@ -68,11 +68,5 @@ fn main() {
             }
             _ => {}
         }
-
-        // updates += 1;
-        // println!(
-        //     "Average UPS: {}",
-        //     updates as f32 / (Instant::now() - start_time).as_secs_f32()
-        // );
     });
 }

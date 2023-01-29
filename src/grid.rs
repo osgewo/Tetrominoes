@@ -47,6 +47,14 @@ impl<T> Grid<T> {
         &self.raw
     }
 
+    pub fn row_len(&self) -> usize {
+        self.row_len
+    }
+
+    pub fn col_len(&self) -> usize {
+        self.col_len
+    }
+
     fn index_of(&self, row: usize, column: usize) -> usize {
         row * self.row_len + column
     }
