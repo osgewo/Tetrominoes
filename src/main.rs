@@ -17,6 +17,7 @@ mod game;
 #[allow(unused)]
 mod grid;
 mod render;
+mod tetromino;
 
 fn main() {
     env_logger::init();
@@ -29,7 +30,7 @@ fn main() {
     let render_context = Arc::new(Mutex::new(pollster::block_on(RenderContext::new(&window))));
     let mut game = Game::new(render_context.clone());
 
-    let start_time = Instant::now();
+    let mut start_time = Instant::now();
     let mut frames = 0;
 
     event_loop.run(move |event, _, control_flow| {
@@ -70,11 +71,14 @@ fn main() {
                     Ok(_) => {}
                     err => err.unwrap(),
                 }
+
                 frames += 1;
-                // println!(
-                //     "Average FPS: {}",
-                //     frames as f32 / (Instant::now() - start_time).as_secs_f32()
-                // );
+                let elapsed = Instant::now() - start_time;
+                if elapsed.as_millis() >= 1000 {
+                    start_time = Instant::now();
+                    println!("FPS: {}", frames as f32 / elapsed.as_secs_f32());
+                    frames = 0;
+                }
             }
             Event::MainEventsCleared => {
                 // RedrawRequested will only trigger once unless manually requested

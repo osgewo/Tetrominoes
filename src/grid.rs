@@ -12,10 +12,10 @@ impl<T> Grid<T> {
     ///
     /// # Panics
     ///
-    /// The function will panic if the provided dimensions don't correspond with the length of the
-    /// values `Vec`.
+    /// The function will panic if the provided dimensions don't correspond with the
+    /// length of the values `Vec`.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// The following example creates a 3x4 grid of strings:
     /// ```
@@ -39,7 +39,8 @@ impl<T> Grid<T> {
         }
     }
 
-    /// Creates a new `Grid` of size `width` by `height` filled with copies of `value`.
+    /// Creates a new `Grid` of size `width` by `height` filled with copies of
+    /// `value`.
     pub fn filled_with(value: T, width: usize, height: usize) -> Self
     where
         T: Clone,
@@ -63,7 +64,7 @@ impl<T> Grid<T> {
     ///
     /// # Panics
     ///
-    /// Panics if the specified `x` or `y` indexes are ouf of bounds.
+    /// Panics if the specified `x` or `y` indices are ouf of bounds.
     pub fn set(&mut self, x: usize, y: usize, value: T) {
         if y >= self.height || x >= self.width {
             panic!("grid index out of bounds");
@@ -77,14 +78,17 @@ impl<T> Grid<T> {
         &self.raw
     }
 
+    /// Returns the height of the grid.
     pub fn height(&self) -> usize {
         self.height
     }
 
+    /// Returns the width of the grid.
     pub fn width(&self) -> usize {
         self.width
     }
 
+    /// Converts `x` and `y` indices into an index into the underlying `Vec`.
     fn index_of(&self, x: usize, y: usize) -> usize {
         y * self.width + x
     }

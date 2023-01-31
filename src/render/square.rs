@@ -48,7 +48,7 @@ impl Instance {
     }
 }
 
-pub struct QuadRenderer {
+pub struct SquareRenderer {
     proj_matrix_buffer: Buffer,
     proj_matrix_bind_group: BindGroup,
     render_pipeline: RenderPipeline,
@@ -59,7 +59,7 @@ pub struct QuadRenderer {
     instance_count: u32,
 }
 
-impl QuadRenderer {
+impl SquareRenderer {
     pub fn new(render_context: Arc<Mutex<RenderContext>>, max_instances: u64) -> Self {
         let locked_context = render_context.lock().unwrap();
         let device = &locked_context.device;

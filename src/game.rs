@@ -1,121 +1,21 @@
 use std::sync::{Arc, Mutex};
 
-use glam::{ivec2, IVec2, Mat4, Vec3, Vec4};
-use rand::Rng;
+use glam::{ivec2, IVec2, Mat4, Vec3};
 use wgpu::{CommandEncoderDescriptor, SurfaceError, TextureViewDescriptor};
 use winit::event::{ElementState, KeyboardInput};
 
 use crate::{
     board::Board,
-    grid::Grid,
     render::{
         context::RenderContext,
-        quad::{self, QuadRenderer},
+        square::{self, SquareRenderer},
     },
+    tetromino::Tetromino,
 };
-
-#[derive(Clone, Copy, Debug)]
-pub enum Shape {
-    I,
-    J,
-    L,
-    O,
-    T,
-    Z,
-    S,
-}
-
-impl Shape {
-    const VARIANTS: [Shape; 7] = [
-        Shape::I,
-        Shape::J,
-        Shape::L,
-        Shape::O,
-        Shape::T,
-        Shape::Z,
-        Shape::S,
-    ];
-
-    fn random() -> Self {
-        Self::VARIANTS[rand::thread_rng().gen_range(0..Self::VARIANTS.len())]
-    }
-
-    fn color(&self) -> Vec4 {
-        match self {
-            Shape::I => Vec4::new(0.2, 0.9, 0.9, 1.0),
-            Shape::J => Vec4::new(0.2, 0.2, 0.9, 1.0),
-            Shape::L => Vec4::new(0.9, 0.5, 0.2, 1.0),
-            Shape::O => Vec4::new(0.9, 0.9, 0.2, 1.0),
-            Shape::T => Vec4::new(0.9, 0.2, 0.9, 1.0),
-            Shape::Z => Vec4::new(0.9, 0.2, 0.2, 1.0),
-            Shape::S => Vec4::new(0.2, 0.9, 0.2, 1.0),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct Tetromino {
-    position: IVec2,
-    rotation: u8,
-    pub shape: Shape,
-}
-
-impl Tetromino {
-    pub fn random_at_origin() -> Self {
-        Self {
-            position: ivec2(3, -1),
-            rotation: 0,
-            shape: Shape::random(),
-        }
-    }
-
-    pub fn squares(&self) -> [IVec2; 4] {
-        let mut sqs = match (self.shape, self.rotation % 4) {
-            (Shape::I, 0 | 2) => [ivec2(0, 2), ivec2(1, 2), ivec2(2, 2), ivec2(3, 2)],
-            (Shape::I, 1 | 3) => [ivec2(2, 0), ivec2(2, 1), ivec2(2, 2), ivec2(2, 3)],
-            (Shape::O, _) => [ivec2(1, 1), ivec2(2, 1), ivec2(1, 2), ivec2(2, 2)],
-            (Shape::J, 0) => [ivec2(1, 1), ivec2(2, 1), ivec2(3, 1), ivec2(3, 2)],
-            (Shape::J, 1) => [ivec2(2, 0), ivec2(2, 1), ivec2(1, 2), ivec2(2, 2)],
-            (Shape::J, 2) => [ivec2(1, 0), ivec2(1, 1), ivec2(2, 1), ivec2(3, 1)],
-            (Shape::J, 3) => [ivec2(2, 0), ivec2(3, 0), ivec2(2, 1), ivec2(2, 2)],
-            (Shape::L, 0) => [ivec2(1, 1), ivec2(2, 1), ivec2(3, 1), ivec2(1, 2)],
-            (Shape::L, 1) => [ivec2(1, 0), ivec2(2, 0), ivec2(2, 1), ivec2(2, 2)],
-            (Shape::L, 2) => [ivec2(3, 0), ivec2(1, 1), ivec2(2, 1), ivec2(3, 1)],
-            (Shape::L, 3) => [ivec2(2, 0), ivec2(2, 1), ivec2(2, 2), ivec2(3, 2)],
-            (Shape::S, 0 | 2) => [ivec2(2, 1), ivec2(3, 1), ivec2(1, 2), ivec2(2, 2)],
-            (Shape::S, 1 | 3) => [ivec2(2, 0), ivec2(2, 1), ivec2(3, 1), ivec2(3, 2)],
-            (Shape::Z, 0 | 2) => [ivec2(1, 1), ivec2(2, 1), ivec2(2, 2), ivec2(3, 2)],
-            (Shape::Z, 1 | 3) => [ivec2(3, 0), ivec2(2, 1), ivec2(3, 1), ivec2(2, 2)],
-            (Shape::T, 0) => [ivec2(1, 1), ivec2(2, 1), ivec2(3, 1), ivec2(2, 2)],
-            (Shape::T, 1) => [ivec2(2, 0), ivec2(1, 1), ivec2(2, 1), ivec2(2, 2)],
-            (Shape::T, 2) => [ivec2(2, 0), ivec2(1, 1), ivec2(2, 1), ivec2(3, 1)],
-            (Shape::T, 3) => [ivec2(2, 0), ivec2(2, 1), ivec2(3, 1), ivec2(2, 2)],
-            _ => unreachable!(),
-        };
-        for s in sqs.iter_mut() {
-            *s += self.position;
-        }
-        sqs
-    }
-
-    fn rotated(&self, by: i8) -> Tetromino {
-        Tetromino {
-            rotation: self.rotation.wrapping_add_signed(by),
-            ..*self
-        }
-    }
-
-    fn moved(&self, by: IVec2) -> Tetromino {
-        Tetromino {
-            position: self.position + by,
-            ..*self
-        }
-    }
-}
 
 pub struct Game {
     render_context: Arc<Mutex<RenderContext>>,
-    quad_renderer: QuadRenderer,
+    quad_renderer: SquareRenderer,
     board: Board,
     falling_tetromino: Tetromino,
     ticks_elapsed: usize,
@@ -123,13 +23,11 @@ pub struct Game {
 
 impl Game {
     pub fn new(render_context: Arc<Mutex<RenderContext>>) -> Self {
-        let grid = Grid::filled_with(Some(Shape::J), 10, 20);
-
         Self {
             render_context: render_context.clone(),
-            quad_renderer: QuadRenderer::new(
+            quad_renderer: SquareRenderer::new(
                 render_context.clone(),
-                4 * (7 + grid.width() * grid.height()) as u64,
+                4 * (7 + Board::WIDTH * Board::HEIGHT) as u64,
             ),
             board: Board::empty(),
             falling_tetromino: Tetromino::random_at_origin(),
@@ -139,24 +37,31 @@ impl Game {
 
     pub fn keyboard_input(&mut self, input: KeyboardInput) {
         match (input.scancode, input.state) {
-            (44, ElementState::Pressed) => {
+            // Rotate counterclockwise. [Q] / [Z] / [I]
+            (16 | 44 | 23, ElementState::Pressed) => {
                 self.try_rotate(-1);
             }
-            (45, ElementState::Pressed) => {
+            // Rotate clockwise. [E] / [X] / [P]
+            (18 | 45 | 25, ElementState::Pressed) => {
                 self.try_rotate(1);
             }
-            (37, ElementState::Pressed) => {
+            // Move left. [A] / [Left] / [K]
+            (30 | 57419 | 37, ElementState::Pressed) => {
                 self.try_move(ivec2(-1, 0));
             }
-            (39, ElementState::Pressed) => {
+            // Move right. [D] / [Right] / [;]
+            (32 | 57421 | 39, ElementState::Pressed) => {
                 self.try_move(ivec2(1, 0));
             }
-            (38, ElementState::Pressed) => {
+            // Move down. [S] / [Down] / [L]
+            (31 | 57424 | 38, ElementState::Pressed) => {
                 self.try_move(ivec2(0, 1));
             }
+            // Drop. [Space]
             (57, ElementState::Pressed) => {
                 self.drop();
             }
+            // TODO Remove once everything else is finished.
             (scancode, ElementState::Pressed) => println!("{scancode}"),
             _ => (),
         }
@@ -170,6 +75,7 @@ impl Game {
         }
     }
 
+    /// Rotates the falling tetromino if possible.
     fn try_rotate(&mut self, by: i8) {
         let rotated = self.falling_tetromino.rotated(by);
         if self.board.can_fit(rotated) {
@@ -177,6 +83,7 @@ impl Game {
         }
     }
 
+    /// Moves the falling tetromino if possible.
     fn try_move(&mut self, by: IVec2) -> bool {
         let moved = self.falling_tetromino.moved(by);
         if self.board.can_fit(moved) {
@@ -193,35 +100,34 @@ impl Game {
         }
     }
 
+    /// Drops the falling tetromino and place it immediately.
     fn drop(&mut self) {
         while self.try_move(ivec2(0, 1)) {}
         self.finalize();
     }
 
+    /// Places the falling tetromino and spawns a new one.
     fn finalize(&mut self) {
         self.board.place(self.falling_tetromino);
-
         self.falling_tetromino = Tetromino::random_at_origin();
-        // TODO Check for fit (game over)
+        // TODO Count score.
+        // TODO Check for fit (game over).
     }
 
+    /// Moves the falling tetromino down. If it can't be moved down it's placed.
     fn fall(&mut self) {
         if !self.try_move(ivec2(0, 1)) {
             self.finalize();
         }
     }
 
-    fn build_proj_mat(render_context: &RenderContext) -> Mat4 {
-        return Mat4::orthographic_lh(
-            0.0,
-            render_context.config.width as f32,
-            render_context.config.height as f32,
-            0.0,
-            0.0,
-            1.0,
-        ) * Mat4::from_scale(Vec3::new(30.0, 30.0, 1.0));
+    /// Creates the projection matrix for a given surface size.
+    fn build_proj_mat(width: u32, height: u32) -> Mat4 {
+        return Mat4::orthographic_lh(0.0, width as f32, height as f32, 0.0, 0.0, 1.0)
+            * Mat4::from_scale(Vec3::new(30.0, 30.0, 1.0));
     }
 
+    /// Renders the game.
     pub fn render(&mut self) -> Result<(), SurfaceError> {
         let render_context = self.render_context.lock().unwrap();
         let output = render_context.surface.get_current_texture()?;
@@ -278,7 +184,7 @@ impl Game {
             });
         let instances = grid
             .chain(falling)
-            .map(|(pos, color)| quad::Instance {
+            .map(|(pos, color)| square::Instance {
                 position: pos.as_vec2(),
                 color,
             })
@@ -287,7 +193,7 @@ impl Game {
         self.quad_renderer.render(
             &mut render_pass,
             queue,
-            Self::build_proj_mat(&render_context),
+            Self::build_proj_mat(render_context.config.width, render_context.config.height),
         )?;
 
         drop(render_pass);

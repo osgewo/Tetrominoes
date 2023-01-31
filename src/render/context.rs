@@ -4,6 +4,7 @@ use wgpu::{
 };
 use winit::{dpi::PhysicalSize, window::Window};
 
+/// Groups together all wgpu objects neccessary for rendering.
 pub struct RenderContext {
     pub surface: Surface,
     pub device: Device,
@@ -12,6 +13,7 @@ pub struct RenderContext {
 }
 
 impl RenderContext {
+    /// Creates a new rendering context on the given window with default settings.
     pub async fn new(window: &Window) -> Self {
         let size = window.inner_size();
 
@@ -60,6 +62,7 @@ impl RenderContext {
         }
     }
 
+    /// Modifies the config and configures the surface for an updated window size.
     pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
             self.config.width = new_size.width;
