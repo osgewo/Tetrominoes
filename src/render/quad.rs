@@ -4,8 +4,8 @@ use bytemuck::{Pod, Zeroable};
 use glam::{Mat4, Vec2, Vec4};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    BindGroup, BindGroupDescriptor, BindGroupEntry, Buffer, BufferUsages, Queue, RenderPass,
-    RenderPipeline, ShaderStages, SurfaceError,
+    BindGroup, BindGroupDescriptor, BindGroupEntry, Buffer, BufferDescriptor, BufferUsages, Queue,
+    RenderPass, RenderPipeline, ShaderStages, SurfaceError,
 };
 
 use super::context::RenderContext;
@@ -60,7 +60,7 @@ pub struct QuadRenderer {
 }
 
 impl QuadRenderer {
-    pub fn new(render_context: Arc<Mutex<RenderContext>>, instances: &[Instance]) -> Self {
+    pub fn new(render_context: Arc<Mutex<RenderContext>>, max_instances: u64) -> Self {
         let locked_context = render_context.lock().unwrap();
         let device = &locked_context.device;
 
@@ -155,10 +155,11 @@ impl QuadRenderer {
             contents: bytemuck::cast_slice(INDICES),
             usage: wgpu::BufferUsages::INDEX,
         });
-        let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Instances buffer"),
-            contents: bytemuck::cast_slice(instances),
-            usage: wgpu::BufferUsages::VERTEX,
+        let instance_buffer = device.create_buffer(&BufferDescriptor {
+            label: Some("quad renderer: instance buffer"),
+            size: max_instances * (std::mem::size_of::<Instance>() as u64),
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
         });
 
         drop(locked_context);
@@ -171,8 +172,13 @@ impl QuadRenderer {
             index_buffer,
             index_count: INDICES.len() as u32,
             instance_buffer,
-            instance_count: instances.len() as u32,
+            instance_count: 0,
         }
+    }
+
+    pub fn write_instances(&mut self, queue: &Queue, instances: &[Instance]) {
+        queue.write_buffer(&self.instance_buffer, 0, bytemuck::cast_slice(instances));
+        self.instance_count = instances.len() as u32;
     }
 
     pub fn render<'a>(

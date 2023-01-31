@@ -1,18 +1,22 @@
+use std::iter::repeat;
+
 pub struct Grid<T> {
     // Row-major representation of the grid.
     raw: Vec<T>,
-    row_len: usize,
-    col_len: usize,
+    width: usize,
+    height: usize,
 }
 
 impl<T> Grid<T> {
     /// Creates a new `Grid` from a `Vec` of values in row-major order.
     ///
     /// # Panics
+    ///
     /// The function will panic if the provided dimensions don't correspond with the length of the
     /// values `Vec`.
     ///
     /// # Example
+    ///
     /// The following example creates a 3x4 grid of strings:
     /// ```
     /// let grid = Grid::from_row_major(vec![
@@ -22,41 +26,67 @@ impl<T> Grid<T> {
     ///     "A4", "B4", "C4",
     /// ], 3, 4);
     /// ```
-    pub fn from_row_major(values: Vec<T>, row_len: usize, col_len: usize) -> Self {
+    pub fn from_row_major(values: Vec<T>, width: usize, height: usize) -> Self {
         assert_eq!(
             values.len(),
-            row_len * col_len,
+            width * height,
             "all rows and columns in a grid must be the same length"
         );
         Self {
             raw: values,
-            row_len,
-            col_len,
+            width,
+            height,
+        }
+    }
+
+    /// Creates a new `Grid` of size `width` by `height` filled with copies of `value`.
+    pub fn filled_with(value: T, width: usize, height: usize) -> Self
+    where
+        T: Clone,
+    {
+        Self {
+            raw: repeat(value).take(width * height).collect(),
+            width,
+            height,
         }
     }
 
     /// Returns the value at the specified position.
-    pub fn get(&self, row: usize, column: usize) -> Option<&T> {
-        if row >= self.row_len || column >= self.col_len {
+    pub fn get(&self, x: usize, y: usize) -> Option<&T> {
+        if y >= self.height || x >= self.width {
             return None;
         }
-        Some(&self.raw[self.index_of(row, column)])
+        Some(&self.raw[self.index_of(x, y)])
     }
 
-    pub fn as_row_major(&self) -> &Vec<T> {
+    /// Sets the value at the specified position.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the specified `x` or `y` indexes are ouf of bounds.
+    pub fn set(&mut self, x: usize, y: usize, value: T) {
+        if y >= self.height || x >= self.width {
+            panic!("grid index out of bounds");
+        }
+        let index = self.index_of(x, y);
+        self.raw[index] = value;
+    }
+
+    /// Returns all values in row-major order.
+    pub fn as_row_major(&self) -> &[T] {
         &self.raw
     }
 
-    pub fn row_len(&self) -> usize {
-        self.row_len
+    pub fn height(&self) -> usize {
+        self.height
     }
 
-    pub fn col_len(&self) -> usize {
-        self.col_len
+    pub fn width(&self) -> usize {
+        self.width
     }
 
-    fn index_of(&self, row: usize, column: usize) -> usize {
-        row * self.row_len + column
+    fn index_of(&self, x: usize, y: usize) -> usize {
+        y * self.width + x
     }
 }
 
@@ -74,9 +104,9 @@ mod tests {
             "A4", "B4", "C4",
         ], 3, 4);
 
-        assert_eq!(grid.get(1, 2), Some(&"C2"));
-        assert_eq!(grid.get(4, 1), None);
-        assert_eq!(grid.get(0, 5), None);
+        assert_eq!(grid.get(2, 1), Some(&"C2"));
+        assert_eq!(grid.get(1, 4), None);
+        assert_eq!(grid.get(5, 0), None);
     }
 
     #[test]
