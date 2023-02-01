@@ -21,7 +21,7 @@ var<uniform> view_proj: mat4x4<f32>;
 @vertex
 fn vs_main(vert_in: VertexInput, inst_in: InstanceInput) -> VertexOutput {
     var out: VertexOutput;
-    out.clip_position = view_proj * vec4<f32>(vert_in.position + inst_in.position, 0.0, 1.0);
+    out.clip_position = view_proj * vec4<f32>(vert_in.position * 30.0 + inst_in.position, 0.0, 1.0);
     out.color = inst_in.color;
     out.vert_pos = vert_in.position;
     return out;

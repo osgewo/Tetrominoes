@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use glam::{ivec2, vec2, vec3, vec4, IVec2, Mat4, Vec3};
+use glam::{ivec2, vec2, vec4, IVec2, Mat4};
 use wgpu::{CommandEncoderDescriptor, SurfaceError, TextureViewDescriptor};
 use winit::event::{ElementState, KeyboardInput};
 
@@ -11,7 +11,7 @@ use crate::{
         quad::{self, QuadRenderer},
         square::{self, SquareRenderer},
     },
-    tetromino::Tetromino,
+    tetromino::{Shape, Tetromino},
 };
 
 pub struct Game {
@@ -20,6 +20,7 @@ pub struct Game {
     quad_renderer: QuadRenderer,
     board: Board,
     falling_tetromino: Tetromino,
+    next_shape: Shape,
     ticks_elapsed: usize,
     score: u32,
 }
@@ -36,6 +37,7 @@ impl Game {
             quad_renderer: QuadRenderer::new(&ctx, 100),
             board: Board::empty(),
             falling_tetromino: Tetromino::random_at_origin(),
+            next_shape: Shape::random(),
             ticks_elapsed: 0,
             score: 0,
         }
@@ -119,7 +121,8 @@ impl Game {
         self.score += Self::calc_score(rows_cleared);
         println!("Score: {}", self.score);
 
-        self.falling_tetromino = Tetromino::random_at_origin();
+        self.falling_tetromino = Tetromino::new_at_origin(self.next_shape);
+        self.next_shape = Shape::random();
         if !self.board.can_fit(self.falling_tetromino) {
             // TODO Game over screen.
             println!("Game over! Score: {}", self.score);
@@ -192,13 +195,22 @@ impl Game {
             &mut render_pass,
             &ctx.queue,
             proj_matrix,
-            &[quad::Instance {
-                position: vec2(20.0, 20.0),
-                size: vec2(310.0, 610.0),
-                fill_color: vec4(0.0, 0.0, 0.0, 0.0),
-                border_size: 5.0,
-                border_color: vec4(0.8, 0.8, 0.8, 1.0),
-            }],
+            &[
+                quad::Instance {
+                    position: vec2(20.0, 20.0),
+                    size: vec2(310.0, 610.0),
+                    fill_color: vec4(0.0, 0.0, 0.0, 0.0),
+                    border_size: 5.0,
+                    border_color: vec4(0.8, 0.8, 0.8, 1.0),
+                },
+                quad::Instance {
+                    position: vec2(350.0, 20.0),
+                    size: vec2(210.0, 150.0),
+                    fill_color: vec4(0.0, 0.0, 0.0, 0.0),
+                    border_size: 5.0,
+                    border_color: vec4(0.8, 0.8, 0.8, 1.0),
+                },
+            ],
         )?;
 
         let squares = self.falling_tetromino.squares();
@@ -222,32 +234,41 @@ impl Game {
                     )
                 })
             });
-        let instances = grid
-            .chain(falling)
-            .map(|(pos, color)| square::Instance {
-                position: pos.as_vec2(),
-                color,
-            })
-            .collect::<Vec<_>>();
-        self.square_renderer.render(
-            &mut render_pass,
-            &ctx.queue,
-            proj_matrix
-                * Mat4::from_translation(vec3(25.0, 25.0, 0.0))
-                * Mat4::from_scale(Vec3::splat(30.0)),
-            &instances,
-        )?;
+        let instances = grid.chain(falling).map(|(pos, color)| square::Instance {
+            position: vec2(25.0, 25.0) + pos.as_vec2() * vec2(30.0, 30.0),
+            color,
+        });
+        let next_squares = self.next_shape.squares(0);
+        let next = next_squares.iter().map(|&sq| (sq, self.next_shape.color()));
+        let next_instances = next.map(|(pos, color)| square::Instance {
+            position: vec2(
+                455.0 - (((self.next_shape.width(0) % 2) as f32 * 0.5 + 2.0) * 30.0),
+                50.0,
+            ) + pos.as_vec2() * vec2(30.0, 30.0),
+            color,
+        });
+        let all_instances = instances.chain(next_instances).collect::<Vec<_>>();
+        self.square_renderer
+            .render(&mut render_pass, &ctx.queue, proj_matrix, &all_instances)?;
 
         drop(render_pass);
 
         // Text
         ctx.glyph_brush.queue(wgpu_glyph::Section {
-            screen_position: (350.0, 30.0),
-            text: vec![wgpu_glyph::Text::new("Next")
+            screen_position: (455.0, 30.0),
+            text: vec![wgpu_glyph::Text::new("NEXT")
                 .with_color([1.0, 1.0, 1.0, 1.0])
-                .with_scale(40.0)],
-            bounds: (ctx.config.width as f32, ctx.config.height as f32),
-            ..Default::default()
+                .with_scale(30.0)],
+            bounds: (f32::INFINITY, f32::INFINITY),
+            layout: wgpu_glyph::Layout::default_wrap().h_align(wgpu_glyph::HorizontalAlign::Center),
+        });
+        ctx.glyph_brush.queue(wgpu_glyph::Section {
+            screen_position: (455.0, 200.0),
+            text: vec![wgpu_glyph::Text::new(&format!("SCORE\n{}", self.score))
+                .with_color([1.0, 1.0, 1.0, 1.0])
+                .with_scale(30.0)],
+            bounds: (f32::INFINITY, f32::INFINITY),
+            layout: wgpu_glyph::Layout::default_wrap().h_align(wgpu_glyph::HorizontalAlign::Center),
         });
         ctx.glyph_brush
             .draw_queued(

@@ -23,7 +23,7 @@ fn main() {
     env_logger::init();
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
-        .with_inner_size(PhysicalSize::new(600, 650))
+        .with_inner_size(PhysicalSize::new(580, 650))
         .build(&event_loop)
         .unwrap();
 

@@ -58,7 +58,7 @@ impl RenderContext {
         };
         surface.configure(&device, &config);
 
-        let font = FontArc::try_from_slice(include_bytes!("font/OpenSans-Regular.ttf")).unwrap();
+        let font = FontArc::try_from_slice(include_bytes!("font/RobotoFlex-Regular.ttf")).unwrap();
         let glyph_brush = GlyphBrushBuilder::using_font(font).build(&device, config.format);
 
         Self {
