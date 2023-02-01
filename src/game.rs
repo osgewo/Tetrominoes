@@ -23,6 +23,8 @@ pub struct Game {
     next_shape: Shape,
     ticks_elapsed: usize,
     score: u32,
+    level: u32,
+    rows_cleared: u32,
 }
 
 impl Game {
@@ -40,6 +42,8 @@ impl Game {
             next_shape: Shape::random(),
             ticks_elapsed: 0,
             score: 0,
+            level: 0,
+            rows_cleared: 0,
         }
     }
 
@@ -118,8 +122,8 @@ impl Game {
     fn finalize(&mut self) {
         self.board.place(self.falling_tetromino);
         let rows_cleared = self.board.clear_complete();
+        self.rows_cleared += rows_cleared as u32;
         self.score += Self::calc_score(rows_cleared);
-        println!("Score: {}", self.score);
 
         self.falling_tetromino = Tetromino::new_at_origin(self.next_shape);
         self.next_shape = Shape::random();
@@ -210,6 +214,27 @@ impl Game {
                     border_size: 5.0,
                     border_color: vec4(0.8, 0.8, 0.8, 1.0),
                 },
+                quad::Instance {
+                    position: vec2(350.0, 190.0),
+                    size: vec2(210.0, 80.0),
+                    fill_color: vec4(0.0, 0.0, 0.0, 0.0),
+                    border_size: 5.0,
+                    border_color: vec4(0.8, 0.8, 0.8, 1.0),
+                },
+                quad::Instance {
+                    position: vec2(350.0, 290.0),
+                    size: vec2(210.0, 80.0),
+                    fill_color: vec4(0.0, 0.0, 0.0, 0.0),
+                    border_size: 5.0,
+                    border_color: vec4(0.8, 0.8, 0.8, 1.0),
+                },
+                quad::Instance {
+                    position: vec2(350.0, 390.0),
+                    size: vec2(210.0, 80.0),
+                    fill_color: vec4(0.0, 0.0, 0.0, 0.0),
+                    border_size: 5.0,
+                    border_color: vec4(0.8, 0.8, 0.8, 1.0),
+                },
             ],
         )?;
 
@@ -267,6 +292,24 @@ impl Game {
             text: vec![wgpu_glyph::Text::new(&format!("SCORE\n{}", self.score))
                 .with_color([1.0, 1.0, 1.0, 1.0])
                 .with_scale(30.0)],
+            bounds: (f32::INFINITY, f32::INFINITY),
+            layout: wgpu_glyph::Layout::default_wrap().h_align(wgpu_glyph::HorizontalAlign::Center),
+        });
+        ctx.glyph_brush.queue(wgpu_glyph::Section {
+            screen_position: (455.0, 300.0),
+            text: vec![wgpu_glyph::Text::new(&format!("LEVEL\n{}", self.level))
+                .with_color([1.0, 1.0, 1.0, 1.0])
+                .with_scale(30.0)],
+            bounds: (f32::INFINITY, f32::INFINITY),
+            layout: wgpu_glyph::Layout::default_wrap().h_align(wgpu_glyph::HorizontalAlign::Center),
+        });
+        ctx.glyph_brush.queue(wgpu_glyph::Section {
+            screen_position: (455.0, 400.0),
+            text: vec![
+                wgpu_glyph::Text::new(&format!("LINES\n{}", self.rows_cleared))
+                    .with_color([1.0, 1.0, 1.0, 1.0])
+                    .with_scale(30.0),
+            ],
             bounds: (f32::INFINITY, f32::INFINITY),
             layout: wgpu_glyph::Layout::default_wrap().h_align(wgpu_glyph::HorizontalAlign::Center),
         });
