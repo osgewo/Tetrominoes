@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use glam::{ivec2, IVec2, Mat4, Vec3};
+use glam::{ivec2, vec2, vec3, vec4, IVec2, Mat4, Vec3};
 use wgpu::{CommandEncoderDescriptor, SurfaceError, TextureViewDescriptor};
 use winit::event::{ElementState, KeyboardInput};
 
@@ -8,6 +8,7 @@ use crate::{
     board::Board,
     render::{
         context::RenderContext,
+        quad::{self, QuadRenderer},
         square::{self, SquareRenderer},
     },
     tetromino::Tetromino,
@@ -15,7 +16,8 @@ use crate::{
 
 pub struct Game {
     render_context: Arc<Mutex<RenderContext>>,
-    quad_renderer: SquareRenderer,
+    square_renderer: SquareRenderer,
+    quad_renderer: QuadRenderer,
     board: Board,
     falling_tetromino: Tetromino,
     ticks_elapsed: usize,
@@ -24,12 +26,14 @@ pub struct Game {
 
 impl Game {
     pub fn new(render_context: Arc<Mutex<RenderContext>>) -> Self {
+        let ctx = render_context.lock().unwrap();
         Self {
             render_context: render_context.clone(),
-            quad_renderer: SquareRenderer::new(
-                render_context.clone(),
+            square_renderer: SquareRenderer::new(
+                &ctx,
                 4 * (7 + Board::WIDTH * Board::HEIGHT) as u64,
             ),
+            quad_renderer: QuadRenderer::new(&ctx, 100),
             board: Board::empty(),
             falling_tetromino: Tetromino::random_at_origin(),
             ticks_elapsed: 0,
@@ -147,8 +151,7 @@ impl Game {
 
     /// Creates the projection matrix for a given surface size.
     fn build_proj_mat(width: u32, height: u32) -> Mat4 {
-        return Mat4::orthographic_lh(0.0, width as f32, height as f32, 0.0, 0.0, 1.0)
-            * Mat4::from_scale(Vec3::new(30.0, 30.0, 1.0));
+        Mat4::orthographic_lh(0.0, width as f32, height as f32, 0.0, 0.0, 1.0)
     }
 
     /// Renders the game.
@@ -172,16 +175,31 @@ impl Game {
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: 0.0,
-                        g: 0.0,
-                        b: 0.0,
-                        a: 0.0,
+                        r: 0.02,
+                        g: 0.02,
+                        b: 0.02,
+                        a: 1.0,
                     }),
                     store: true,
                 },
             })],
             depth_stencil_attachment: None,
         });
+
+        let proj_matrix = Self::build_proj_mat(ctx.config.width, ctx.config.height);
+
+        self.quad_renderer.render(
+            &mut render_pass,
+            &ctx.queue,
+            proj_matrix,
+            &[quad::Instance {
+                position: vec2(20.0, 20.0),
+                size: vec2(310.0, 610.0),
+                fill_color: vec4(0.0, 0.0, 0.0, 0.0),
+                border_size: 5.0,
+                border_color: vec4(0.8, 0.8, 0.8, 1.0),
+            }],
+        )?;
 
         let squares = self.falling_tetromino.squares();
         let falling = squares
@@ -211,10 +229,12 @@ impl Game {
                 color,
             })
             .collect::<Vec<_>>();
-        self.quad_renderer.render(
+        self.square_renderer.render(
             &mut render_pass,
             &ctx.queue,
-            Self::build_proj_mat(ctx.config.width, ctx.config.height),
+            proj_matrix
+                * Mat4::from_translation(vec3(25.0, 25.0, 0.0))
+                * Mat4::from_scale(Vec3::splat(30.0)),
             &instances,
         )?;
 
