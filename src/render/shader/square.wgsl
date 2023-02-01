@@ -32,21 +32,29 @@ fn vs_main(vert_in: VertexInput, inst_in: InstanceInput) -> VertexOutput {
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var x: f32;
-    if in.vert_pos.y < 0.2 && in.vert_pos.x >= in.vert_pos.y && 1.0 - in.vert_pos.x >= in.vert_pos.y {
+    // 0.99 instead of 1.0 is neccessary to align everything onto the pixel grid
+    // perfectly due to float precision
+    if in.vert_pos.y <= 0.2
+        && in.vert_pos.x > in.vert_pos.y
+        && 0.99 - in.vert_pos.x > in.vert_pos.y
+    {
         // Top
         x = 1.2;
-    } else if in.vert_pos.y > 0.8 && in.vert_pos.x < in.vert_pos.y && 1.0 - in.vert_pos.x < in.vert_pos.y {
+    } else if in.vert_pos.y >= 0.8
+        && in.vert_pos.x <= in.vert_pos.y
+        && 1.0 - in.vert_pos.x <= in.vert_pos.y
+    {
         // Bottom
         x = 0.6;
-    } else if in.vert_pos.x > 0.8 && in.vert_pos.y < in.vert_pos.x {
+    } else if in.vert_pos.x >= 0.8 {
         // Right
         x = 0.9;
-    } else if in.vert_pos.x < 0.2 {
+    } else if in.vert_pos.x <= 0.2 {
         // Left
         x = 0.8;
     } else {
         // Middle
         x = 1.0;
     }
-    return vec4<f32>(in.color.r * x, in.color.g * x, in.color.b * x, in.color.a);
+    return vec4<f32>(in.color.rgb * x, in.color.a);
 }
