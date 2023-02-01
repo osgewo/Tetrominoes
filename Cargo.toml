@@ -15,3 +15,4 @@ bytemuck = { version = "1.12", features = ["derive"] }
 image = { version = "0.24", default-features = false, features = ["png"] }
 glam = { version = "0.22", features = ["scalar-math", "bytemuck"] }
 rand = "0.8"
+wgpu_glyph = "0.18"

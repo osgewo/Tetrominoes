@@ -19,6 +19,7 @@ pub struct Game {
     board: Board,
     falling_tetromino: Tetromino,
     ticks_elapsed: usize,
+    score: u32,
 }
 
 impl Game {
@@ -32,6 +33,7 @@ impl Game {
             board: Board::empty(),
             falling_tetromino: Tetromino::random_at_origin(),
             ticks_elapsed: 0,
+            score: 0,
         }
     }
 
@@ -100,7 +102,7 @@ impl Game {
         }
     }
 
-    /// Drops the falling tetromino and place it immediately.
+    /// Drops the falling tetromino and places it immediately.
     fn drop(&mut self) {
         while self.try_move(ivec2(0, 1)) {}
         self.finalize();
@@ -109,15 +111,37 @@ impl Game {
     /// Places the falling tetromino and spawns a new one.
     fn finalize(&mut self) {
         self.board.place(self.falling_tetromino);
+        let rows_cleared = self.board.clear_complete();
+        self.score += Self::calc_score(rows_cleared);
+        println!("Score: {}", self.score);
+
         self.falling_tetromino = Tetromino::random_at_origin();
-        // TODO Count score.
-        // TODO Check for fit (game over).
+        if !self.board.can_fit(self.falling_tetromino) {
+            // TODO Game over screen.
+            println!("Game over! Score: {}", self.score);
+        }
     }
 
     /// Moves the falling tetromino down. If it can't be moved down it's placed.
     fn fall(&mut self) {
         if !self.try_move(ivec2(0, 1)) {
             self.finalize();
+        }
+    }
+
+    /// Calculates the score for a given number of cleared rows.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the number of cleared rows is greater than 4.
+    fn calc_score(rows_cleared: u8) -> u32 {
+        match rows_cleared {
+            0 => 0,
+            1 => 40,
+            2 => 100,
+            3 => 300,
+            4 => 1200,
+            _ => panic!("it should not be possible to clear more than 4 rows at once"),
         }
     }
 
@@ -129,13 +153,13 @@ impl Game {
 
     /// Renders the game.
     pub fn render(&mut self) -> Result<(), SurfaceError> {
-        let render_context = self.render_context.lock().unwrap();
-        let output = render_context.surface.get_current_texture()?;
+        let ctx = &mut *self.render_context.lock().unwrap();
+        let output = ctx.surface.get_current_texture()?;
         let view = output
             .texture
             .create_view(&TextureViewDescriptor::default());
 
-        let mut encoder = render_context
+        let mut encoder = ctx
             .device
             .create_command_encoder(&CommandEncoderDescriptor {
                 label: Some("Render Encoder"),
@@ -158,8 +182,6 @@ impl Game {
             })],
             depth_stencil_attachment: None,
         });
-
-        let queue = &render_context.queue;
 
         let squares = self.falling_tetromino.squares();
         let falling = squares
@@ -189,16 +211,37 @@ impl Game {
                 color,
             })
             .collect::<Vec<_>>();
-        self.quad_renderer.write_instances(queue, &instances);
         self.quad_renderer.render(
             &mut render_pass,
-            queue,
-            Self::build_proj_mat(render_context.config.width, render_context.config.height),
+            &ctx.queue,
+            Self::build_proj_mat(ctx.config.width, ctx.config.height),
+            &instances,
         )?;
 
         drop(render_pass);
 
-        queue.submit(std::iter::once(encoder.finish()));
+        // Text
+        ctx.glyph_brush.queue(wgpu_glyph::Section {
+            screen_position: (350.0, 30.0),
+            text: vec![wgpu_glyph::Text::new("Next")
+                .with_color([1.0, 1.0, 1.0, 1.0])
+                .with_scale(40.0)],
+            bounds: (ctx.config.width as f32, ctx.config.height as f32),
+            ..Default::default()
+        });
+        ctx.glyph_brush
+            .draw_queued(
+                &ctx.device,
+                &mut ctx.staging_belt,
+                &mut encoder,
+                &view,
+                ctx.config.width,
+                ctx.config.height,
+            )
+            .unwrap();
+
+        ctx.staging_belt.finish();
+        ctx.queue.submit(std::iter::once(encoder.finish()));
 
         output.present();
         Ok(())

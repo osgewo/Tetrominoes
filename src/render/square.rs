@@ -1,14 +1,14 @@
 use std::sync::{Arc, Mutex};
 
+use crate::render::bind_group::{BindGroup, Entry};
 use bytemuck::{Pod, Zeroable};
 use glam::{Mat4, Vec2, Vec4};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    BindGroup, BindGroupDescriptor, BindGroupEntry, Buffer, BufferDescriptor, BufferUsages, Queue,
-    RenderPass, RenderPipeline, ShaderStages, SurfaceError,
+    Buffer, BufferUsages, Queue, RenderPass, SurfaceError,
 };
 
-use super::context::RenderContext;
+use super::{context::RenderContext, pipeline::Pipeline};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Pod, Zeroable)]
@@ -51,12 +51,11 @@ impl Instance {
 pub struct SquareRenderer {
     proj_matrix_buffer: Buffer,
     proj_matrix_bind_group: BindGroup,
-    render_pipeline: RenderPipeline,
+    pipeline: Pipeline,
     vertex_buffer: Buffer,
     index_buffer: Buffer,
     index_count: u32,
     instance_buffer: Buffer,
-    instance_count: u32,
 }
 
 impl SquareRenderer {
@@ -69,69 +68,28 @@ impl SquareRenderer {
             contents: bytemuck::cast_slice(&[Mat4::IDENTITY]),
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
         });
-        let proj_matrix_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("quad renderer: proj. matrix bind group layout"),
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                }],
-            });
-        let proj_matrix_bind_group = device.create_bind_group(&BindGroupDescriptor {
-            label: Some("quad renderer: proj. matrix bind group"),
-            layout: &proj_matrix_bind_group_layout,
-            entries: &[BindGroupEntry {
+        let proj_matrix_bind_group = BindGroup::new(
+            device,
+            &[Entry {
                 binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
                 resource: proj_matrix_buffer.as_entire_binding(),
             }],
-        });
+        );
 
         let shader = device.create_shader_module(wgpu::include_wgsl!("shader/quad.wgsl"));
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Pipeline Layout"),
-            bind_group_layouts: &[&proj_matrix_bind_group_layout],
-            push_constant_ranges: &[],
-        });
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Render Pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: "vs_main",
-                buffers: &[Vertex::desc(), Instance::desc()],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: locked_context.config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
-                polygon_mode: wgpu::PolygonMode::Fill,
-                unclipped_depth: false,
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState {
-                count: 1,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            multiview: None,
-        });
+        let pipeline = Pipeline::new(
+            device,
+            &shader,
+            locked_context.config.format,
+            &[proj_matrix_bind_group.layout()],
+            &[Vertex::desc(), Instance::desc()],
+        );
 
         #[rustfmt::skip]
         const VERTICES: &[Vertex] = &[
@@ -155,37 +113,30 @@ impl SquareRenderer {
             contents: bytemuck::cast_slice(INDICES),
             usage: wgpu::BufferUsages::INDEX,
         });
-        let instance_buffer = device.create_buffer(&BufferDescriptor {
+        let instance_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("quad renderer: instance buffer"),
             size: max_instances * (std::mem::size_of::<Instance>() as u64),
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
 
-        drop(locked_context);
-
         Self {
             proj_matrix_buffer,
             proj_matrix_bind_group,
-            render_pipeline,
+            pipeline,
             vertex_buffer,
             index_buffer,
             index_count: INDICES.len() as u32,
             instance_buffer,
-            instance_count: 0,
         }
     }
 
-    pub fn write_instances(&mut self, queue: &Queue, instances: &[Instance]) {
-        queue.write_buffer(&self.instance_buffer, 0, bytemuck::cast_slice(instances));
-        self.instance_count = instances.len() as u32;
-    }
-
     pub fn render<'a>(
-        &'a self,
+        &'a mut self,
         render_pass: &mut RenderPass<'a>,
         queue: &Queue,
         proj_matrix: Mat4,
+        instances: &[Instance],
     ) -> Result<(), SurfaceError> {
         queue.write_buffer(
             &self.proj_matrix_buffer,
@@ -193,12 +144,14 @@ impl SquareRenderer {
             bytemuck::cast_slice(&[proj_matrix]),
         );
 
-        render_pass.set_pipeline(&self.render_pipeline);
+        queue.write_buffer(&self.instance_buffer, 0, bytemuck::cast_slice(instances));
+
+        render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &self.proj_matrix_bind_group, &[]);
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
         render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-        render_pass.draw_indexed(0..self.index_count, 0, 0..self.instance_count);
+        render_pass.draw_indexed(0..self.index_count, 0, 0..instances.len() as u32);
 
         Ok(())
     }

@@ -1,7 +1,9 @@
 use wgpu::{
-    Backends, CompositeAlphaMode, Device, DeviceDescriptor, Features, Limits, PowerPreference,
-    PresentMode, Queue, RequestAdapterOptions, Surface, SurfaceConfiguration, TextureUsages,
+    util::StagingBelt, Backends, CompositeAlphaMode, Device, DeviceDescriptor, Features, Limits,
+    PowerPreference, PresentMode, Queue, RequestAdapterOptions, Surface, SurfaceConfiguration,
+    TextureUsages,
 };
+use wgpu_glyph::{ab_glyph::FontArc, GlyphBrush, GlyphBrushBuilder};
 use winit::{dpi::PhysicalSize, window::Window};
 
 /// Groups together all wgpu objects neccessary for rendering.
@@ -10,6 +12,8 @@ pub struct RenderContext {
     pub device: Device,
     pub queue: Queue,
     pub config: SurfaceConfiguration,
+    pub staging_belt: StagingBelt,
+    pub glyph_brush: GlyphBrush<()>,
 }
 
 impl RenderContext {
@@ -54,11 +58,16 @@ impl RenderContext {
         };
         surface.configure(&device, &config);
 
+        let font = FontArc::try_from_slice(include_bytes!("font/OpenSans-Regular.ttf")).unwrap();
+        let glyph_brush = GlyphBrushBuilder::using_font(font).build(&device, config.format);
+
         Self {
             surface,
             device,
             queue,
             config,
+            staging_belt: StagingBelt::new(1024),
+            glyph_brush,
         }
     }
 

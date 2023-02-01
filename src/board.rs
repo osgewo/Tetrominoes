@@ -55,16 +55,14 @@ impl Board {
             self.grid
                 .set(square.x as usize, square.y as usize, Some(tetromino.shape));
         }
-        self.clear_complete();
     }
 
-    /// Clears complete rows and shifts above rows down. Returns the number of rows
-    /// cleared and whether they were contiguous.
-    fn clear_complete(&mut self) -> (u8, bool) {
+    /// Clears complete rows and shifts above rows down. Returns the number of
+    /// cleared rows.
+    pub fn clear_complete(&mut self) -> u8 {
         // TODO Rewrite this function to use new convenience functions on `Grid`
 
         let mut rows_cleared = 0;
-        let mut contiguous_rows_cleared = 0;
 
         for row in 0..self.grid.height() {
             // Check if the row is complete (all squares filled).
@@ -73,7 +71,6 @@ impl Board {
                 .all(|sq| sq.is_some());
             if row_complete {
                 rows_cleared += 1;
-                contiguous_rows_cleared += 1;
 
                 // Clear row.
                 for x in 0..self.grid.width() {
@@ -90,11 +87,9 @@ impl Board {
                         }
                     }
                 }
-            } else {
-                contiguous_rows_cleared = 0;
             }
         }
 
-        (rows_cleared, contiguous_rows_cleared == 4)
+        rows_cleared
     }
 }
