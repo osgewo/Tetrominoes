@@ -12,8 +12,8 @@ impl<T> Grid<T> {
     ///
     /// # Panics
     ///
-    /// The function will panic if the provided dimensions don't correspond with the
-    /// length of the values `Vec`.
+    /// Panics if the provided dimensions don't correspond with the length of the
+    /// values `Vec`.
     ///
     /// # Examples
     ///

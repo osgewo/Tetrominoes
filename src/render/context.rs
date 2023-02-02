@@ -11,7 +11,7 @@ use crate::board::Board;
 
 use super::{quad::QuadRenderer, square::SquareRenderer};
 
-/// Groups together all wgpu objects neccessary for rendering.
+/// Groups together all objects neccessary for rendering.
 pub struct RenderContext {
     pub surface: Surface,
     pub device: Device,

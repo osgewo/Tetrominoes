@@ -6,14 +6,14 @@ use winit::event::{ElementState, KeyboardInput};
 use crate::{
     board::Board,
     render::{context::RenderContext, quad::Quad, square::TetrominoSquare},
-    tetromino::{Shape, Tetromino},
+    tetromino::{FallingTetromino, Tetromino},
 };
 
 /// An in-progress game.
 pub struct Game {
     board: Board,
-    falling_tetromino: Tetromino,
-    next_shape: Shape,
+    falling_tetromino: FallingTetromino,
+    next_tetromino: Tetromino,
     ticks_elapsed: usize,
     score: u32,
     level: u32,
@@ -25,8 +25,8 @@ impl Game {
     pub fn new() -> Self {
         Self {
             board: Board::empty(),
-            falling_tetromino: Tetromino::random_at_origin(),
-            next_shape: Shape::random(),
+            falling_tetromino: FallingTetromino::random_at_origin(),
+            next_tetromino: Tetromino::random(),
             ticks_elapsed: 0,
             score: 0,
             level: 0,
@@ -114,8 +114,8 @@ impl Game {
         self.rows_cleared += rows_cleared as u32;
         self.score += Self::calc_score(rows_cleared);
 
-        self.falling_tetromino = Tetromino::new_at_origin(self.next_shape);
-        self.next_shape = Shape::random();
+        self.falling_tetromino = FallingTetromino::new_at_origin(self.next_tetromino);
+        self.next_tetromino = Tetromino::random();
         if !self.board.can_fit(self.falling_tetromino) {
             // TODO Game over screen.
             println!("Game over! Score: {}", self.score);
@@ -191,13 +191,13 @@ impl Game {
         let center = vec2(position.x + size.x / 2.0, position.y + 30.0);
 
         // How many squares to offset the tetromino so that it's centered (-2.0 or -2.5)
-        let offset = -((self.next_shape.width(0) % 2) as f32 * 0.5 + 2.0);
+        let offset = -((self.next_tetromino.width(0) % 2) as f32 * 0.5 + 2.0);
 
-        let next_squares = self.next_shape.squares(0);
+        let next_squares = self.next_tetromino.squares(0);
         let instances = next_squares.iter().map(|&pos| TetrominoSquare {
             position: center
                 + (vec2(offset, 0.0) + pos.as_vec2()) * Vec2::splat(TetrominoSquare::SIZE),
-            color: self.next_shape.color(),
+            color: self.next_tetromino.color(),
         });
         ctx.square_renderer.submit_iter(instances);
     }

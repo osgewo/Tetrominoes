@@ -3,13 +3,13 @@ use glam::{ivec2, vec2, vec4, Vec2};
 use crate::{
     grid::Grid,
     render::{context::RenderContext, quad::Quad, square::TetrominoSquare},
-    tetromino::{Shape, Tetromino},
+    tetromino::{FallingTetromino, Tetromino},
 };
 
 /// Represents the game board. Mainly a wrapper around `Grid` with convenience
-/// functions.
+/// methods.
 pub struct Board {
-    pub grid: Grid<Option<Shape>>,
+    grid: Grid<Option<Tetromino>>,
 }
 
 impl Board {
@@ -23,8 +23,8 @@ impl Board {
         }
     }
 
-    /// Checks wheter a tetromino can fit onto the board.
-    pub fn can_fit(&self, tetromino: Tetromino) -> bool {
+    /// Checks wheter a falling tetromino can fit onto the board.
+    pub fn can_fit(&self, tetromino: FallingTetromino) -> bool {
         for square in tetromino.squares() {
             // Allow tetrominos to stick out the top of the board to enable immediate
             // rotation.
@@ -45,12 +45,12 @@ impl Board {
         true
     }
 
-    /// Places a tetromino onto the board.
+    /// Places a falling tetromino onto the board.
     ///
     /// # Panics
     ///
     /// Panics if the tetromino is out of bounds of the board (except at the top).
-    pub fn place(&mut self, tetromino: Tetromino) {
+    pub fn place(&mut self, tetromino: FallingTetromino) {
         for square in tetromino.squares() {
             if square.y < 0 {
                 continue;
