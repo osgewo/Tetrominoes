@@ -28,7 +28,7 @@ fn main() {
         .unwrap();
 
     let render_context = Arc::new(Mutex::new(pollster::block_on(RenderContext::new(&window))));
-    let mut game = Game::new(render_context.clone());
+    let mut game = Game::new();
 
     let mut start_time = Instant::now();
     let mut frames = 0;
@@ -60,14 +60,14 @@ fn main() {
                     ..
                 } => {
                     // Restart on Enter press
-                    game = Game::new(render_context.clone());
+                    game = Game::new();
                 }
                 WindowEvent::KeyboardInput { input, .. } => game.keyboard_input(*input),
                 _ => {}
             },
             Event::RedrawRequested(window_id) if window_id == window.id() => {
                 game.tick();
-                match game.render() {
+                match game.render(&mut render_context.lock().unwrap()) {
                     Ok(_) => {}
                     err => err.unwrap(),
                 }

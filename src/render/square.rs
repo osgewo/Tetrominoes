@@ -5,13 +5,14 @@ use bytemuck::{Pod, Zeroable};
 use glam::{Mat4, Vec2, Vec4};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    Buffer, BufferUsages, Queue, RenderPass, SurfaceError,
+    Buffer, BufferUsages, Device, Queue, RenderPass, SurfaceConfiguration, SurfaceError,
 };
 
-use super::{context::RenderContext, pipeline::Pipeline};
+use super::pipeline::Pipeline;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Pod, Zeroable)]
+// TODO Consider generating vertices in shader instead.
 struct Vertex {
     position: Vec2,
 }
@@ -30,12 +31,15 @@ impl Vertex {
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Pod, Zeroable)]
-pub struct Instance {
+pub struct TetrominoSquare {
     pub position: Vec2,
     pub color: Vec4,
 }
 
-impl Instance {
+impl TetrominoSquare {
+    /// The size of a tetromino square in pixels.
+    pub const SIZE: f32 = 30.0;
+
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         const ATTRIBUTES: [wgpu::VertexAttribute; 2] =
             wgpu::vertex_attr_array![1 => Float32x2, 2 => Float32x4];
@@ -56,12 +60,11 @@ pub struct SquareRenderer {
     index_buffer: Buffer,
     index_count: u32,
     instance_buffer: Buffer,
+    instances: Vec<TetrominoSquare>,
 }
 
 impl SquareRenderer {
-    pub fn new(render_context: &RenderContext, max_instances: u64) -> Self {
-        let device = &render_context.device;
-
+    pub fn new(device: &Device, config: &SurfaceConfiguration, max_instances: u64) -> Self {
         let proj_matrix_buffer = device.create_buffer_init(&BufferInitDescriptor {
             label: Some("square renderer: proj. matrix buffer"),
             contents: bytemuck::cast_slice(&[Mat4::IDENTITY]),
@@ -85,9 +88,9 @@ impl SquareRenderer {
         let pipeline = Pipeline::new(
             device,
             &shader,
-            render_context.config.format,
+            config.format,
             &[proj_matrix_bind_group.layout()],
-            &[Vertex::desc(), Instance::desc()],
+            &[Vertex::desc(), TetrominoSquare::desc()],
         );
 
         #[rustfmt::skip]
@@ -114,7 +117,7 @@ impl SquareRenderer {
         });
         let instance_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("square renderer: instance buffer"),
-            size: max_instances * (std::mem::size_of::<Instance>() as u64),
+            size: max_instances * (std::mem::size_of::<TetrominoSquare>() as u64),
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -127,7 +130,12 @@ impl SquareRenderer {
             index_buffer,
             index_count: INDICES.len() as u32,
             instance_buffer,
+            instances: Vec::with_capacity(max_instances as usize),
         }
+    }
+
+    pub fn submit_iter(&mut self, squares: impl Iterator<Item = TetrominoSquare>) {
+        self.instances.extend(squares);
     }
 
     pub fn render<'a>(
@@ -135,7 +143,6 @@ impl SquareRenderer {
         render_pass: &mut RenderPass<'a>,
         queue: &Queue,
         proj_matrix: Mat4,
-        instances: &[Instance],
     ) -> Result<(), SurfaceError> {
         queue.write_buffer(
             &self.proj_matrix_buffer,
@@ -143,14 +150,20 @@ impl SquareRenderer {
             bytemuck::cast_slice(&[proj_matrix]),
         );
 
-        queue.write_buffer(&self.instance_buffer, 0, bytemuck::cast_slice(instances));
+        queue.write_buffer(
+            &self.instance_buffer,
+            0,
+            bytemuck::cast_slice(&self.instances),
+        );
 
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &self.proj_matrix_bind_group, &[]);
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
         render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-        render_pass.draw_indexed(0..self.index_count, 0, 0..instances.len() as u32);
+        render_pass.draw_indexed(0..self.index_count, 0, 0..self.instances.len() as u32);
+
+        self.instances.clear();
 
         Ok(())
     }

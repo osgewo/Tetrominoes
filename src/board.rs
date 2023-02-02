@@ -1,5 +1,8 @@
+use glam::{ivec2, vec2, vec4, Vec2};
+
 use crate::{
     grid::Grid,
+    render::{context::RenderContext, quad::Quad, square::TetrominoSquare},
     tetromino::{Shape, Tetromino},
 };
 
@@ -46,7 +49,7 @@ impl Board {
     ///
     /// # Panics
     ///
-    /// Panics if the tetromino is out of bounds of the board. (Except at the top.)
+    /// Panics if the tetromino is out of bounds of the board (except at the top).
     pub fn place(&mut self, tetromino: Tetromino) {
         for square in tetromino.squares() {
             if square.y < 0 {
@@ -60,7 +63,7 @@ impl Board {
     /// Clears complete rows and shifts above rows down. Returns the number of
     /// cleared rows.
     pub fn clear_complete(&mut self) -> u8 {
-        // TODO Rewrite this function to use new convenience functions on `Grid`
+        // TODO Rewrite this function to use new convenience functions on `Grid`.
 
         let mut rows_cleared = 0;
 
@@ -91,5 +94,43 @@ impl Board {
         }
 
         rows_cleared
+    }
+
+    /// Render the board.
+    pub fn render(&self, ctx: &mut RenderContext, offset: Vec2) {
+        ctx.quad_renderer.submit(Quad {
+            position: offset,
+            // TODO This should be calculated from border size and tetromino square size.
+            size: vec2(310.0, 610.0),
+            fill_color: vec4(0.0, 0.0, 0.0, 0.0),
+            border_size: 5.0,
+            border_color: vec4(0.8, 0.8, 0.8, 1.0),
+        });
+
+        // TODO Rewrite this to use new convenience functions on `Grid`.
+        let instances = self
+            .grid
+            .as_row_major()
+            .iter()
+            .enumerate()
+            .filter_map(|(i, sq)| {
+                sq.as_ref().map(|sq| {
+                    (
+                        ivec2(
+                            (i % self.grid.width()) as i32,
+                            (i / self.grid.width()) as i32,
+                        ),
+                        sq.color(),
+                    )
+                })
+            })
+            .map(|(pos, color)| TetrominoSquare {
+                position: offset
+                    // TODO This should be calculated from border size
+                    + Vec2::splat(5.0)
+                    + pos.as_vec2() * Vec2::splat(TetrominoSquare::SIZE),
+                color,
+            });
+        ctx.square_renderer.submit_iter(instances);
     }
 }

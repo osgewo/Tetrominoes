@@ -5,14 +5,14 @@ use bytemuck::{Pod, Zeroable};
 use glam::{Mat4, Vec2, Vec4};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    Buffer, BufferUsages, Queue, RenderPass, SurfaceError,
+    Buffer, BufferUsages, Device, Queue, RenderPass, SurfaceConfiguration, SurfaceError,
 };
 
-use super::{context::RenderContext, pipeline::Pipeline};
+use super::pipeline::Pipeline;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Pod, Zeroable)]
-pub struct Instance {
+pub struct Quad {
     pub position: Vec2,
     pub size: Vec2,
     pub fill_color: Vec4,
@@ -20,14 +20,14 @@ pub struct Instance {
     pub border_color: Vec4,
 }
 
-impl Instance {
+impl Quad {
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         const ATTRIBUTES: [wgpu::VertexAttribute; 5] = wgpu::vertex_attr_array![
-            0 => Float32x2,
-            1 => Float32x2,
-            2 => Float32x4,
-            3 => Float32,
-            4 => Float32x4
+        0 => Float32x2,
+        1 => Float32x2,
+        2 => Float32x4,
+        3 => Float32,
+        4 => Float32x4
         ];
 
         wgpu::VertexBufferLayout {
@@ -43,12 +43,11 @@ pub struct QuadRenderer {
     proj_matrix_bind_group: BindGroup,
     pipeline: Pipeline,
     instance_buffer: Buffer,
+    instances: Vec<Quad>,
 }
 
 impl QuadRenderer {
-    pub fn new(render_context: &RenderContext, max_instances: u64) -> Self {
-        let device = &render_context.device;
-
+    pub fn new(device: &Device, config: &SurfaceConfiguration, max_instances: u64) -> Self {
         let proj_matrix_buffer = device.create_buffer_init(&BufferInitDescriptor {
             label: Some("quad renderer: proj. matrix buffer"),
             contents: bytemuck::cast_slice(&[Mat4::IDENTITY]),
@@ -72,14 +71,14 @@ impl QuadRenderer {
         let pipeline = Pipeline::new(
             device,
             &shader,
-            render_context.config.format,
+            config.format,
             &[proj_matrix_bind_group.layout()],
-            &[Instance::desc()],
+            &[Quad::desc()],
         );
 
         let instance_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("quad renderer: instance buffer"),
-            size: max_instances * (std::mem::size_of::<Instance>() as u64),
+            size: max_instances * (std::mem::size_of::<Quad>() as u64),
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -89,7 +88,12 @@ impl QuadRenderer {
             proj_matrix_bind_group,
             pipeline,
             instance_buffer,
+            instances: Vec::with_capacity(max_instances as usize),
         }
+    }
+
+    pub fn submit(&mut self, quad: Quad) {
+        self.instances.push(quad);
     }
 
     pub fn render<'a>(
@@ -97,7 +101,6 @@ impl QuadRenderer {
         render_pass: &mut RenderPass<'a>,
         queue: &Queue,
         proj_matrix: Mat4,
-        instances: &[Instance],
     ) -> Result<(), SurfaceError> {
         queue.write_buffer(
             &self.proj_matrix_buffer,
@@ -105,13 +108,18 @@ impl QuadRenderer {
             bytemuck::cast_slice(&[proj_matrix]),
         );
 
-        queue.write_buffer(&self.instance_buffer, 0, bytemuck::cast_slice(instances));
+        queue.write_buffer(
+            &self.instance_buffer,
+            0,
+            bytemuck::cast_slice(&self.instances),
+        );
 
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &self.proj_matrix_bind_group, &[]);
         render_pass.set_vertex_buffer(0, self.instance_buffer.slice(..));
-        render_pass.draw(0..6, 0..instances.len() as u32);
+        render_pass.draw(0..6, 0..self.instances.len() as u32);
 
+        self.instances.clear();
         Ok(())
     }
 }

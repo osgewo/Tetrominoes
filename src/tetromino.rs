@@ -79,18 +79,6 @@ impl Shape {
             _ => unreachable!(),
         }
     }
-
-    /// Returns the height of this shape as the number of squares.
-    pub fn height(self, rotation: u8) -> u8 {
-        match (self, rotation % 4) {
-            (Shape::I, 0 | 2) => 1,
-            (Shape::I, 1 | 3) => 4,
-            (Shape::O, _) => 2,
-            (_, 0 | 2) => 2,
-            (_, 1 | 3) => 3,
-            _ => unreachable!(),
-        }
-    }
 }
 
 /// Tetromino in space (including rotation and position).
@@ -102,6 +90,7 @@ pub struct Tetromino {
 }
 
 impl Tetromino {
+    /// The starting position of a falling tetromino.
     const ORIGIN: IVec2 = ivec2(3, -1);
 
     /// Creates a new tetromino with a given shape positioned at origin (3, -1).
@@ -150,10 +139,5 @@ impl Tetromino {
             position: self.position + by,
             ..self
         }
-    }
-
-    /// Returns a new instance of this tetromino at the specified position.
-    pub fn at(self, position: IVec2) -> Tetromino {
-        Tetromino { position, ..self }
     }
 }
