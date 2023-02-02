@@ -6,6 +6,7 @@ use winit::event::{ElementState, KeyboardInput};
 use crate::{
     board::Board,
     render::{context::RenderContext, quad::Quad, square::TetrominoSquare},
+    scene::{Action, Scene},
     tetromino::{FallingTetromino, Tetromino},
 };
 
@@ -31,48 +32,6 @@ impl Game {
             score: 0,
             level: 0,
             rows_cleared: 0,
-        }
-    }
-
-    /// Handles keyboard input.
-    pub fn keyboard_input(&mut self, input: KeyboardInput) {
-        match (input.scancode, input.state) {
-            // Rotate counterclockwise. [Q] / [Z] / [I]
-            (16 | 44 | 23, ElementState::Pressed) => {
-                self.try_rotate(-1);
-            }
-            // Rotate clockwise. [E] / [X] / [P]
-            (18 | 45 | 25, ElementState::Pressed) => {
-                self.try_rotate(1);
-            }
-            // Move left. [A] / [Left] / [K]
-            (30 | 57419 | 37, ElementState::Pressed) => {
-                self.try_move(ivec2(-1, 0));
-            }
-            // Move right. [D] / [Right] / [;]
-            (32 | 57421 | 39, ElementState::Pressed) => {
-                self.try_move(ivec2(1, 0));
-            }
-            // Move down. [S] / [Down] / [L]
-            (31 | 57424 | 38, ElementState::Pressed) => {
-                self.try_move(ivec2(0, 1));
-            }
-            // Drop. [Space]
-            (57, ElementState::Pressed) => {
-                self.drop();
-            }
-            // TODO Remove once everything else is finished.
-            (scancode, ElementState::Pressed) => println!("{scancode}"),
-            _ => (),
-        }
-    }
-
-    /// Updates the game logic. Should be called 60 times per second.
-    pub fn tick(&mut self) {
-        self.ticks_elapsed += 1;
-        if self.ticks_elapsed == 60 {
-            self.ticks_elapsed = 0;
-            self.fall();
         }
     }
 
@@ -112,7 +71,7 @@ impl Game {
         self.board.place(self.falling_tetromino);
         let rows_cleared = self.board.clear_complete();
         self.rows_cleared += rows_cleared as u32;
-        self.score += Self::calc_score(rows_cleared);
+        self.score += calc_score(rows_cleared);
 
         self.falling_tetromino = FallingTetromino::new_at_origin(self.next_tetromino);
         self.next_tetromino = Tetromino::random();
@@ -129,25 +88,63 @@ impl Game {
             self.finalize();
         }
     }
+}
 
-    /// Calculates the score for a given number of cleared rows.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the number of cleared rows is greater than 4.
-    fn calc_score(rows_cleared: u8) -> u32 {
-        match rows_cleared {
-            0 => 0,
-            1 => 40,
-            2 => 100,
-            3 => 300,
-            4 => 1200,
-            _ => panic!("it should not be possible to clear more than 4 rows at once"),
+impl Scene for Game {
+    /// Handles keyboard input.
+    fn keyboard_input(&mut self, input: KeyboardInput) -> Action {
+        match (input.scancode, input.state) {
+            // Exit [ESC] (temporary)
+            (1, ElementState::Pressed) => {
+                return Action::Exit;
+            }
+            // Restart [ENTER] (temporary)
+            (28, ElementState::Pressed) => {
+                return Action::SwitchScene(Box::new(Game::new()));
+            }
+            // Rotate counterclockwise. [Q] / [Z] / [I]
+            (16 | 44 | 23, ElementState::Pressed) => {
+                self.try_rotate(-1);
+            }
+            // Rotate clockwise. [E] / [X] / [P]
+            (18 | 45 | 25, ElementState::Pressed) => {
+                self.try_rotate(1);
+            }
+            // Move left. [A] / [Left] / [K]
+            (30 | 57419 | 37, ElementState::Pressed) => {
+                self.try_move(ivec2(-1, 0));
+            }
+            // Move right. [D] / [Right] / [;]
+            (32 | 57421 | 39, ElementState::Pressed) => {
+                self.try_move(ivec2(1, 0));
+            }
+            // Move down. [S] / [Down] / [L]
+            (31 | 57424 | 38, ElementState::Pressed) => {
+                self.try_move(ivec2(0, 1));
+            }
+            // Drop. [Space]
+            (57, ElementState::Pressed) => {
+                self.drop();
+            }
+            // TODO Remove once everything else is finished.
+            (scancode, ElementState::Pressed) => println!("{scancode}"),
+            _ => (),
         }
+        Action::Continue
+    }
+
+    /// Updates the game logic. Should be called 60 times per second.
+    fn tick(&mut self) -> Action {
+        self.ticks_elapsed += 1;
+        if self.ticks_elapsed == 60 {
+            self.ticks_elapsed = 0;
+            self.fall();
+        }
+        Action::Continue
     }
 
     /// Renders the game.
-    pub fn render(&mut self, ctx: &mut RenderContext) -> Result<(), SurfaceError> {
+    fn render(&mut self, ctx: &mut RenderContext) -> Result<(), SurfaceError> {
         self.board.render(ctx, vec2(20.0, 20.0));
         self.render_falling(ctx, vec2(25.0, 25.0));
         self.render_next(ctx, vec2(350.0, 20.0), vec2(210.0, 150.0));
@@ -173,7 +170,9 @@ impl Game {
 
         ctx.render_frame()
     }
+}
 
+impl Game {
     /// Renders the falling tetromino.
     fn render_falling(&self, ctx: &mut RenderContext, offset: Vec2) {
         let squares = self.falling_tetromino.squares();
@@ -220,4 +219,20 @@ fn render_boxed_text(ctx: &mut RenderContext, position: Vec2, size: Vec2, text: 
         bounds: (f32::INFINITY, f32::INFINITY),
         layout: Layout::default_wrap().h_align(HorizontalAlign::Center),
     });
+}
+
+/// Calculates the score for a given number of cleared rows.
+///
+/// # Panics
+///
+/// Panics if the number of cleared rows is greater than 4.
+fn calc_score(rows_cleared: u8) -> u32 {
+    match rows_cleared {
+        0 => 0,
+        1 => 40,
+        2 => 100,
+        3 => 300,
+        4 => 1200,
+        _ => panic!("it should not be possible to clear more than 4 rows at once"),
+    }
 }
