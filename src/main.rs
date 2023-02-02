@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use game::Game;
+use main_menu::MainMenu;
 use render::context::RenderContext;
 use scene::{Action, Scene};
 use winit::{
@@ -14,6 +14,7 @@ mod board;
 mod game;
 #[allow(unused)]
 mod grid;
+mod main_menu;
 mod render;
 mod scene;
 mod tetromino;
@@ -49,7 +50,7 @@ impl RunLoop {
         Self {
             window,
             render_context,
-            scene: Box::new(Game::new()),
+            scene: Box::new(MainMenu::new()),
             start_time: Instant::now(),
             frames: 0,
         }

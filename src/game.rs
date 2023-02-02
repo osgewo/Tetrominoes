@@ -94,13 +94,9 @@ impl Scene for Game {
     /// Handles keyboard input.
     fn keyboard_input(&mut self, input: KeyboardInput) -> Action {
         match (input.scancode, input.state) {
-            // Exit [ESC] (temporary)
+            // Exit [Esc] (temporary)
             (1, ElementState::Pressed) => {
                 return Action::Exit;
-            }
-            // Restart [ENTER] (temporary)
-            (28, ElementState::Pressed) => {
-                return Action::SwitchScene(Box::new(Game::new()));
             }
             // Rotate counterclockwise. [Q] / [Z] / [I]
             (16 | 44 | 23, ElementState::Pressed) => {
