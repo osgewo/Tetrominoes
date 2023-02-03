@@ -12,6 +12,7 @@ use winit::{
 
 mod board;
 mod game;
+mod game_over;
 #[allow(unused)]
 mod grid;
 mod main_menu;

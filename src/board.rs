@@ -1,4 +1,4 @@
-use glam::{ivec2, vec2, vec4, Vec2};
+use glam::{vec2, vec4, Vec2};
 
 use crate::{
     grid::Grid,
@@ -55,38 +55,35 @@ impl Board {
             if square.y < 0 {
                 continue;
             }
-            self.grid
-                .set(square.x as usize, square.y as usize, Some(tetromino.shape));
+            self.grid.set(
+                square.x as usize,
+                square.y as usize,
+                Some(tetromino.tetromino),
+            );
         }
     }
 
     /// Clears complete rows and shifts above rows down. Returns the number of
     /// cleared rows.
     pub fn clear_complete(&mut self) -> u8 {
-        // TODO Rewrite this function to use new convenience functions on `Grid`.
-
         let mut rows_cleared = 0;
 
-        for row in 0..self.grid.height() {
-            // Check if the row is complete (all squares filled).
-            let row_complete = (0..self.grid.width())
-                .map(|i| self.grid.get(i, row).unwrap())
-                .all(|sq| sq.is_some());
+        for y in 0..self.grid.height() {
+            // Check if row is complete (all cells fillled).
+            let row_complete = self.grid.row_slice(y).iter().all(|c| c.is_some());
             if row_complete {
                 rows_cleared += 1;
 
                 // Clear row.
-                for x in 0..self.grid.width() {
-                    self.grid.set(x, row, None);
-                }
+                self.grid.row_slice_mut(y).fill(None);
 
                 // Shift above rows down, clear top row.
-                for row in (0..=row).rev() {
-                    for x in 0..self.grid.width() {
-                        if row == 0 {
-                            self.grid.set(x, row, None);
-                        } else {
-                            self.grid.set(x, row, *self.grid.get(x, row - 1).unwrap());
+                for y in (0..=y).rev() {
+                    if y == 0 {
+                        self.grid.row_slice_mut(y).fill(None);
+                    } else {
+                        for x in 0..self.grid.width() {
+                            self.grid.set(x, y, *self.grid.get(x, y - 1).unwrap());
                         }
                     }
                 }
@@ -107,29 +104,16 @@ impl Board {
             border_color: vec4(0.8, 0.8, 0.8, 1.0),
         });
 
-        // TODO Rewrite this to use new convenience functions on `Grid`.
         let instances = self
             .grid
-            .as_row_major()
-            .iter()
-            .enumerate()
-            .filter_map(|(i, sq)| {
-                sq.as_ref().map(|sq| {
-                    (
-                        ivec2(
-                            (i % self.grid.width()) as i32,
-                            (i / self.grid.width()) as i32,
-                        ),
-                        sq.color(),
-                    )
-                })
-            })
-            .map(|(pos, color)| TetrominoSquare {
+            .iter_with_indices()
+            .filter_map(|(x, y, sq)| sq.map(|t| (x, y, t)))
+            .map(|(x, y, t)| TetrominoSquare {
                 position: offset
                     // TODO This should be calculated from border size
                     + Vec2::splat(5.0)
-                    + pos.as_vec2() * Vec2::splat(TetrominoSquare::SIZE),
-                color,
+                    + vec2(x as f32, y as f32) * Vec2::splat(TetrominoSquare::SIZE),
+                color: t.color(),
             });
         ctx.square_renderer.submit_iter(instances);
     }

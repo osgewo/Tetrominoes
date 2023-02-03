@@ -1,4 +1,7 @@
-use std::iter::repeat;
+use std::{
+    iter::{repeat, Enumerate},
+    slice::Iter,
+};
 
 pub struct Grid<T> {
     // Row-major representation of the grid.
@@ -88,9 +91,92 @@ impl<T> Grid<T> {
         self.width
     }
 
+    /// Returns a slice over row `y`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the specified index `y` is out of bounds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let grid = Grid::from_row_major(vec![
+    ///     "A", "B",
+    ///     "C", "D"
+    /// ], 2, 2);
+    /// assert_eq!(grid.row_slice(1), &["C", "D"]);
+    /// ```
+    pub fn row_slice(&self, y: usize) -> &[T] {
+        if y > self.height - 1 {
+            panic!("row index out of bounds");
+        }
+        &self.raw[y * self.width..(y + 1) * self.width]
+    }
+
+    /// Returns a mutable slice over row `y`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the specified index `y` is out of bounds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut grid = Grid::from_row_major(vec![
+    ///     "A", "B",
+    ///     "C", "D"
+    /// ], 2, 2);
+    /// grid.row_slice_mut(1)[0] = "X";
+    /// assert_eq!(grid.row_slice(1), &["X", "D"]);
+    /// ```
+    pub fn row_slice_mut(&mut self, y: usize) -> &mut [T] {
+        if y > self.height - 1 {
+            panic!("row index out of bounds");
+        }
+        &mut self.raw[y * self.width..(y + 1) * self.width]
+    }
+
+    /// Returns an iterator over all values with `x` and `y` indices.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let grid = Grid::from_row_major(vec!["A", "B", "C", "D"], 2, 2);
+    /// let mut iter = grid.iter_with_indices();
+    ///
+    /// assert_eq!(iter.next(), Some((0, 0, &"A")));
+    /// assert_eq!(iter.next(), Some((1, 0, &"B")));
+    /// assert_eq!(iter.next(), Some((0, 1, &"C")));
+    /// assert_eq!(iter.next(), Some((1, 1, &"D")));
+    /// assert_eq!(iter.next(), None);
+    /// ```
+    pub fn iter_with_indices(&self) -> IterWithIndices<T> {
+        IterWithIndices {
+            grid: self,
+            iter: self.raw.iter().enumerate(),
+        }
+    }
+
     /// Converts `x` and `y` indices into an index into the underlying `Vec`.
     fn index_of(&self, x: usize, y: usize) -> usize {
         y * self.width + x
+    }
+}
+
+/// Iterator over all [`Grid`] values with `x` and `y` indices.
+pub struct IterWithIndices<'a, T> {
+    grid: &'a Grid<T>,
+    iter: Enumerate<Iter<'a, T>>,
+}
+
+impl<'a, T> Iterator for IterWithIndices<'a, T> {
+    type Item = (usize, usize, &'a T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.iter.next() {
+            Some((i, value)) => Some((i % self.grid.width(), i / self.grid.width(), value)),
+            None => None,
+        }
     }
 }
 
@@ -122,5 +208,32 @@ mod tests {
             "A1", "B1", "C1",
             "A2", "B2", "C2",
         ], 2, 2);
+    }
+
+    #[test]
+    fn iter_with_indices() {
+        let grid = Grid::from_row_major(vec!["A", "B", "C", "D"], 2, 2);
+        let mut iter = grid.iter_with_indices();
+
+        assert_eq!(iter.next(), Some((0, 0, &"A")));
+        assert_eq!(iter.next(), Some((1, 0, &"B")));
+        assert_eq!(iter.next(), Some((0, 1, &"C")));
+        assert_eq!(iter.next(), Some((1, 1, &"D")));
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn row_slice() {
+        let mut grid = Grid::from_row_major(vec!["A", "B", "C", "D"], 2, 2);
+        grid.row_slice_mut(1)[0] = "X";
+        assert_eq!(grid.row_slice(1), &["X", "D"]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn row_slice_panic() {
+        let grid = Grid::from_row_major(vec!["A", "B", "C", "D"], 2, 2);
+        // Should panic:
+        grid.row_slice(2);
     }
 }

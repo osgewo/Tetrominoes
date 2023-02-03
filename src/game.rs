@@ -5,6 +5,7 @@ use winit::event::{ElementState, KeyboardInput};
 
 use crate::{
     board::Board,
+    game_over::GameOver,
     render::{context::RenderContext, quad::Quad, square::TetrominoSquare},
     scene::{Action, Scene},
     tetromino::{FallingTetromino, Tetromino},
@@ -19,6 +20,7 @@ pub struct Game {
     score: u32,
     level: u32,
     rows_cleared: u32,
+    lost: bool,
 }
 
 impl Game {
@@ -32,6 +34,7 @@ impl Game {
             score: 0,
             level: 0,
             rows_cleared: 0,
+            lost: false,
         }
     }
 
@@ -75,9 +78,9 @@ impl Game {
 
         self.falling_tetromino = FallingTetromino::new_at_origin(self.next_tetromino);
         self.next_tetromino = Tetromino::random();
+
         if !self.board.can_fit(self.falling_tetromino) {
-            // TODO Game over screen.
-            println!("Game over! Score: {}", self.score);
+            self.lost = true;
         }
     }
 
@@ -131,6 +134,11 @@ impl Scene for Game {
 
     /// Updates the game logic. Should be called 60 times per second.
     fn tick(&mut self) -> Action {
+        if self.lost {
+            // TODO Use overlay instead.
+            return Action::SwitchScene(Box::new(GameOver::new(self.score)));
+        }
+
         self.ticks_elapsed += 1;
         if self.ticks_elapsed == 60 {
             self.ticks_elapsed = 0;
@@ -174,7 +182,7 @@ impl Game {
         let squares = self.falling_tetromino.squares();
         let instances = squares.iter().map(|&pos| TetrominoSquare {
             position: offset + pos.as_vec2() * Vec2::splat(TetrominoSquare::SIZE),
-            color: self.falling_tetromino.shape.color(),
+            color: self.falling_tetromino.tetromino.color(),
         });
         ctx.square_renderer.submit_iter(instances);
     }

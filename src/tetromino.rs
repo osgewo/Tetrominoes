@@ -90,7 +90,7 @@ impl Tetromino {
 pub struct FallingTetromino {
     position: IVec2,
     rotation: u8,
-    pub shape: Tetromino,
+    pub tetromino: Tetromino,
 }
 
 impl FallingTetromino {
@@ -98,11 +98,11 @@ impl FallingTetromino {
     const ORIGIN: IVec2 = ivec2(3, -1);
 
     /// Creates a new falling tetromino positioned at [`Self::ORIGIN`].
-    pub fn new_at_origin(shape: Tetromino) -> Self {
+    pub fn new_at_origin(tetromino: Tetromino) -> Self {
         Self {
             position: Self::ORIGIN,
             rotation: 0,
-            shape,
+            tetromino,
         }
     }
 
@@ -112,19 +112,19 @@ impl FallingTetromino {
         Self {
             position: ivec2(3, -1),
             rotation: 0,
-            shape: Tetromino::random(),
+            tetromino: Tetromino::random(),
         }
     }
 
     /// Returns the positions of squares representing this tetromino.
     pub fn squares(&self) -> [IVec2; 4] {
-        let mut squares = self.shape.squares(self.rotation);
-        // Offset relative positions by the position of the tetromino.
-        // TODO Rewrite this.
-        for s in squares.iter_mut() {
-            *s += self.position;
-        }
-        squares
+        let squares = self.tetromino.squares(self.rotation);
+        [
+            squares[0] + self.position,
+            squares[1] + self.position,
+            squares[2] + self.position,
+            squares[3] + self.position,
+        ]
     }
 
     /// Returns a new rotated instance of this tetromino.
