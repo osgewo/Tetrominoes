@@ -129,8 +129,8 @@ impl FallingTetromino {
 
     /// Returns a new rotated instance of this tetromino.
     ///
-    /// Rotation is specified in multiples of 45 deg.
-    /// (1 = 45 deg. clockwise, -1 = 45 deg. counterclockwise).
+    /// Rotation is specified in multiples of 90 deg.
+    /// (1 = 90 deg. clockwise, -1 = 90 deg. counterclockwise).
     pub fn rotated(self, by: i8) -> FallingTetromino {
         FallingTetromino {
             rotation: self.rotation.wrapping_add_signed(by),

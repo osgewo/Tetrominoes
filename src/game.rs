@@ -180,10 +180,13 @@ impl Game {
     /// Renders the falling tetromino.
     fn render_falling(&self, ctx: &mut RenderContext, offset: Vec2) {
         let squares = self.falling_tetromino.squares();
-        let instances = squares.iter().map(|&pos| TetrominoSquare {
-            position: offset + pos.as_vec2() * Vec2::splat(TetrominoSquare::SIZE),
-            color: self.falling_tetromino.tetromino.color(),
-        });
+        let instances = squares
+            .iter()
+            .filter(|pos| pos.y >= 0)
+            .map(|&pos| TetrominoSquare {
+                position: offset + pos.as_vec2() * Vec2::splat(TetrominoSquare::SIZE),
+                color: self.falling_tetromino.tetromino.color(),
+            });
         ctx.square_renderer.submit_iter(instances);
     }
 
